@@ -22,15 +22,16 @@ from langchain.llms import OpenAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.callbacks import get_openai_callback
 import os
-
+import json
 
 
 load_dotenv()
 
 def main():
-    st.header("Chat with PDF")
     # upload a PDF file
-    pdf = st.file_uploader("Upload your PDF", type='pdf')
+    with st.sidebar:
+        st.header("Chat with PDF")
+        pdf = st.file_uploader("Upload your PDF", type='pdf')
     if pdf is not None:
         pdf_reader = PdfReader(pdf)
         text = ""
@@ -38,7 +39,7 @@ def main():
             text += page.extract_text()
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
-            chunk_overlap=200,
+            chunk_overlap=0,
             length_function=len
             )
         
@@ -57,11 +58,7 @@ def main():
             VectorStore = FAISS.from_texts(chunks, embedding=embeddings)
             with open(f"{store_name}.pkl", "wb") as f:
                 pickle.dump(VectorStore, f)
-        # embeddings = OpenAIEmbeddings()
-        # VectorStore = FAISS.from_texts(chunks, embedding=embeddings)
-        # Accept user questions/query
-        # query = st.chat_input("Ask questions about your PDF file:")
-        # st.write(query)
+       
         if "messages" not in st.session_state:
             st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
@@ -76,13 +73,20 @@ def main():
                 docs = VectorStore.similarity_search(query=prompt, k=3)
                 llm = OpenAI()
                 chain = load_qa_chain(llm=llm, chain_type="stuff")
-                with get_openai_callback() as cb:
-                    response = chain.run(input_documents=docs, question=st.session_state.messages)
+                # with get_openai_callback() as cb:
+                response = chain.run(input_documents=docs, question=st.session_state.messages)
                     # print(cb)
                 # st.write(response)
-                # msg = response.choices[0].message
+                print(response)
+                split_result = response.split('{', 1) 
                 st.session_state.messages.append({"role": "assistant", "content": response})
                 st.chat_message("assistant").write(response)
+                if len(split_result) > 1:
+                    json_string = '{' + split_result[1]  
+                    json_object = json.loads(json_string)
+                    print("test",type(json_object))
+                    
+            
 
 if __name__ == '__main__':
     main()
